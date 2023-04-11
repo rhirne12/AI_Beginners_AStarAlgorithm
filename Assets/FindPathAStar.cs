@@ -84,6 +84,81 @@ public class FindPathAStar : MonoBehaviour
         
         Vector3 goalLocation = new Vector3(locations[1].x * maze.scale, 0, locations[1].z * maze.scale);
         goalNode = new PathMarker(new MapLocation(locations[1].x, locations[1].z), 0, 0, 0, Instantiate(end, goalLocation, Quaternion.identity), null);
+
+        open.Clear();
+        closed.Clear();
+        open.Add(startNode);
+        lastPos = startNode;
+    }
+
+    void Search(PathMarker thisNode)
+    {
+        if (thisNode == null) return;
+        if (thisNode.Equals(goalNode))
+        {
+            done = true;
+            return;
+        }
+
+        foreach (MapLocation dir in maze.directions)
+        {
+            MapLocation neighbor = dir + thisNode.location;
+            if (maze.map[neighbor.x,neighbor.z] == 1 ) 
+                continue;
+            if (neighbor.x < 1 || neighbor.x >= maze.width || neighbor.z < 1 || neighbor.z >= maze.depth)
+                continue;
+            if (isClosed(neighbor)) continue;
+
+            float G = Vector2.Distance(thisNode.location.ToVector(), neighbor.ToVector()) + thisNode.G;
+            float H = Vector2.Distance(neighbor.ToVector(), goalNode.location.ToVector());
+            float F = G + H;
+
+            GameObject pathBlock = Instantiate(pathP, new Vector3(neighbor.x * maze.scale, 0, neighbor.z * maze.scale), Quaternion.identity);
+
+
+            TextMesh[] values = pathBlock.GetComponentsInChildren<TextMesh>();
+            values[0].text = "G: " + G.ToString("0.00");
+            values[1].text = "H: " + H.ToString("0.00");
+            values[2].text = "F: " + F.ToString("0.00");
+
+            if (!UpdateMarker(neighbor, G, H, F, thisNode))
+                open.Add(new PathMarker(neighbor, G, H, F, pathBlock, thisNode));
+        }
+
+        open = open.OrderBy(p => p.F).ThenBy(n => n.H).ToList<PathMarker>();
+        PathMarker pm = (PathMarker)open.ElementAt(0);
+        closed.Add(pm);
+
+        open.RemoveAt(0);
+        pm.marker.GetComponent<Renderer>().material = closedMaterial;
+
+        lastPos = pm;
+
+    }
+
+    bool UpdateMarker(MapLocation pos, float g, float h, float f, PathMarker prt)
+    {
+        foreach (PathMarker p in open)
+        {
+            if (p.location.Equals(pos)) 
+            {
+                p.G = g;
+                p.H = h;
+                p.F = f;
+                p.parent = prt;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    bool isClosed(MapLocation marker)
+    {
+        foreach (PathMarker p in closed)
+        {
+            if (p.location.Equals(marker)) return true;
+        }
+        return false;
     }
 
     // Start is called before the first frame update
@@ -97,5 +172,7 @@ public class FindPathAStar : MonoBehaviour
     {
         if (Input.GetKeyDown(KeyCode.P))
             BeginSearch();
+        if (Input.GetKeyDown(KeyCode.C))
+            Search(lastPos);
     }
 }
